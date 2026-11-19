@@ -29,7 +29,7 @@ Only the app's code is public. Game data never leaves the iPad.
 - **iPad:** Settings → Display & Brightness → Auto-Lock → **Never** on game days. The app tries to keep the screen on by itself, but older iPads don't always honor that.
 
 ## 4. Game day
-**New game** → enter the opponent, home/away, and lineups (jersey numbers only are fine) → **Start game**.
+**New game** → enter the opponent, home/away, and lineups → **Start game**. No lineup yet? Leave the spots blank — a gold **Who's up?** card asks for each hitter's number the first time he bats.
 
 For each pitch: **pitch type → velo → tap location → result**.
 

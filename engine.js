@@ -562,9 +562,11 @@
     return (v === 'mid' && h === 'middle' ? 'heart' : (v === 'mid' ? '' : v + ' ') + h).trim() + ' (' + zone + ')';
   }
 
+  function ordinal(n) { return ['th', 'st', 'nd', 'rd'][(n % 100 > 10 && n % 100 < 14) ? 0 : Math.min(n % 10, 4) % 4] || 'th'; }
+
   const api = {
     PITCH_TYPES, RESULTS, STRIKE_RES, SWING_RES, CIRCLE_RES, HIT_CODES, SLOTS,
-    uid, other, newGame, player, pLabel, handFor, inZone, defaultMoves, validateMoves, baseName,
+    uid, other, newGame, player, pLabel, ordinal, handFor, inZone, defaultMoves, validateMoves, baseName,
     replay, pitchingStats, veloSummary, pitcherSidebar, ipStr, pct, zoneNumber, locWords,
     battingSide: bat, fieldingSide: fld
   };

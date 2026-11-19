@@ -38,7 +38,7 @@
       'lineup_slot', 'batter_num', 'batter_name', 'batter_hand', 'pitcher_num', 'pitcher_name', 'pitcher_throws',
       'row_type', 'pitch_of_pa', 'pitcher_pitch_count', 'balls_before', 'strikes_before', 'outs_before',
       'runner_1b', 'runner_2b', 'runner_3b', 'pitch_type_code', 'pitch_type', 'velo', 'loc_x', 'loc_y', 'in_zone', 'zone_1_14',
-      'location', 'pitch_result', 'swing', 'whiff', 'pa_result', 'notation', 'batted_ball', 'spray_x', 'spray_y', 'runs_on_play',
+      'location', 'pitch_result', 'swing', 'whiff', 'pa_result', 'notation', 'batted_ball', 'spray_x_ft', 'spray_y_ft', 'runs_on_play',
       'runner_event', 'pa_note'];
     const rows = [cols.join(',')];
     const pas = S.pas.slice(); if (S.cur) pas.push(S.cur);
@@ -64,7 +64,7 @@
             p.zone === null ? '' : p.zone ? 1 : 0, E.zoneNumber(p.loc), E.locWords(p.loc, p.hand), E.RESULTS[p.res],
             p.swing ? 1 : 0, p.whiff ? 1 : 0,
             isLast ? pa.result.code + (pa.result.looking ? ' (looking)' : '') : '', isLast ? pa.result.notation : '',
-            isLast ? (pa.result.bb || '') : '', isLast && pa.result.spray ? pa.result.spray.x.toFixed(3) : '', isLast && pa.result.spray ? pa.result.spray.y.toFixed(3) : '',
+            isLast ? (pa.result.bb || '') : '', isLast && pa.result.spray && pa.result.spray.xft != null ? pa.result.spray.xft : '', isLast && pa.result.spray && pa.result.spray.yft != null ? pa.result.spray.yft : '',
             isLast ? pa.runsOnPlay : '', '', isLast ? pa.notes.join(' | ') : '']);
         } else if (it.a) {
           r = common(pa.pitcher).concat(['automatic', '', '', it.a.b, it.a.s, '', '', '', '', '', '', '', '', '', '', '', '', it.a.res === 'B' ? 'Automatic ball' : 'Automatic strike', '', '', '', '', '', '', '', '', '', '']);

@@ -138,7 +138,7 @@ label.f { display: block; font-size: 13px; font-weight: 700; color: var(--ink2);
 .mover { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
 .mover .who { width: 190px; font-weight: 700; }
 .err { color: var(--bad); font-weight: 700; min-height: 22px; }
-.field-wrap { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.field-wrap { display: grid; grid-template-columns: 1.35fr 1fr; gap: 14px; }
 @media (max-width: 760px) { .field-wrap { grid-template-columns: 1fr; } }
 .field svg { width: 100%; height: auto; background: #fff; border: 1px solid var(--line); border-radius: 14px; touch-action: none; }
 .keypad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; max-width: 360px; margin: 0 auto; }

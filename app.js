@@ -29,7 +29,8 @@
       '<button data-act="' + name + '" data-v="' + esc(v) + '" class="' + (String(v) === String(val) ? 'on' : '') + '" ' + (dis ? 'disabled' : '') + '>' + l + '</button>').join('') + '</div>';
   }
   const pl = (side, pid) => E.player(App.game, side, pid);
-  const pName = (side, pid) => { const p = pl(side, pid); return '#' + p.num + (p.name ? ' ' + p.name : ''); };
+  const unknown = pid => pid == null || String(pid).charAt(0) === '?';
+  const pName = (side, pid) => { if (unknown(pid)) return 'Unknown #?'; const p = pl(side, pid); return '#' + p.num + (p.name ? ' ' + p.name : ''); };
   const teamName = side => App.game[side].name;
   function today() { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
 
@@ -115,7 +116,7 @@
       '<div class="row" style="margin-top:10px"><button class="btn small" data-act="copyLast">Copy lineups from last game vs this opponent</button><button class="btn small" data-act="fillRoster">Fill ' + esc(st.team) + ' names from roster</button></div></div>' +
       '<div class="setup-grid" style="margin-top:14px"><div class="card"><h2>' + esc(st.team) + ' lineup</h2>' + lu('sjf') + '</div>' +
       '<div class="card"><h2 id="oppHead">' + esc(s.opp || 'Opponent') + ' lineup</h2>' + lu('opp') + '</div></div>' +
-      '<p class="muted">Only jersey numbers are required. Names fill in automatically from your roster and from past games against the same team. Switch hitters (S) are charted from the side they bat against each pitcher.</p>' +
+      '<p class="muted"><b>Don’t have a lineup yet?</b> Leave any spots (or the starting pitcher) blank and start the game — the app asks for each hitter’s number the first time he comes up. Names fill in automatically from your roster and from past games against the same team. Switch hitters (S) are charted from the side they bat against each pitcher.</p>' +
       '<div class="row" style="margin:10px 0 40px"><div class="grow"></div><button class="btn primary" data-act="startGame" style="font-size:20px;min-height:62px;padding:0 34px">Start game ›</button></div></div>';
   }
   // refresh setup fields in place (a full re-render would drop the iPad keyboard)
@@ -147,10 +148,8 @@
     ['sjf', 'opp'].forEach(k => {
       const nums = s.lu[k].map(r => String(r.num).trim());
       const nm = k === 'sjf' ? st.team : (s.opp || 'Opponent');
-      if (nums.some(n => !n)) errs.push(nm + ': every lineup spot needs a jersey number.');
       const dup = nums.filter((n, i) => n && nums.indexOf(n) !== i);
       if (dup.length) errs.push(nm + ': #' + dup[0] + ' is in the lineup twice.');
-      if (!String(s.p[k].num).trim()) errs.push(nm + ': enter the starting pitcher’s number.');
     });
     if (errs.length) { toast(errs[0]); return; }
     const sjfSide = s.sjfSide, oppSide = E.other(sjfSide);
@@ -162,10 +161,14 @@
           { name: o.name || base.name || (players[id] && players[id].name) || '', bats: o.bats || base.bats || 'R', throws: o.throws || base.throws || (players[id] && players[id].throws) || 'R', ot: base.ot || '', note: base.note || '' });
         return id;
       };
-      const lineup = s.lu[k].map(r => add(r.num, { name: r.name.trim(), bats: r.bats }));
-      const pid = 'h' === pref ? 'h' + String(s.p[k].num).trim() : 'a' + String(s.p[k].num).trim();
-      const pBase = players[pid] ? { name: s.p[k].name.trim() || players[pid].name, bats: players[pid].bats } : { name: s.p[k].name.trim() };
-      add(s.p[k].num, Object.assign(pBase, { throws: s.p[k].throws }));
+      // blank spots stay unknown (null) and get filled in as each hitter comes up
+      const lineup = s.lu[k].map(r => (String(r.num).trim() ? add(r.num, { name: r.name.trim(), bats: r.bats }) : null));
+      let pid = '?' + pref; // unknown starting pitcher until someone enters him
+      if (String(s.p[k].num).trim()) {
+        pid = pref + String(s.p[k].num).trim();
+        const pBase = players[pid] ? { name: s.p[k].name.trim() || players[pid].name, bats: players[pid].bats } : { name: s.p[k].name.trim() };
+        add(s.p[k].num, Object.assign(pBase, { throws: s.p[k].throws }));
+      }
       return { name: k === 'sjf' ? st.team : s.opp.trim(), players, lineup, pitcher: pid };
     };
     const sides = {}; sides[sjfSide] = mk('sjf', sjfSide); sides[oppSide] = mk('opp', oppSide);
@@ -301,12 +304,13 @@
     const otLab = pp.ot ? pp.ot : 'OT';
     let h = '<div class="chart"><section>';
     h += '<div class="matchup">' +
-      '<div class="mcard"><div class="lab">Pitching · ' + esc(teamName(fs)) + '</div><div class="who">' + esc(pName(fs, pid)) + '</div>' +
+      (unknown(pid) ? '<button class="mcard" data-act="fillPitcher" data-side="' + fs + '" style="text-align:left;background:#fff7e0;border:2px solid var(--gold)"><div class="lab">Pitching · ' + esc(teamName(fs)) + '</div><div class="who">Who’s pitching? Tap to enter #</div><div class="sub">' + (S.pitchCount[pid] || 0) + ' pitches so far — they’ll be credited to him</div></button>' : '<div class="mcard"><div class="lab">Pitching · ' + esc(teamName(fs)) + '</div><div class="who">' + esc(pName(fs, pid)) + '</div>' +
       '<div class="sub">' + (pp.throws === 'L' ? 'LHP' : 'RHP') + ' · <b>' + (S.pitchCount[pid] || 0) + '</b> pitches · ' + innP + ' this inn.</div>' +
-      '<div class="act"><button class="btn" data-act="pchange">Pitching change</button></div></div>' +
+      '<div class="act"><button class="btn" data-act="pchange">Pitching change</button></div></div>') +
+      (unknown(b.pid) ? '<button class="mcard" data-act="fillBatter" data-side="' + b.side + '" data-slot="' + b.slot + '" style="text-align:left;background:#fff7e0;border:2px solid var(--gold)"><div class="lab">Batting · ' + esc(teamName(b.side)) + ' · #' + (b.slot + 1) + ' hitter</div><div class="who">Who’s up? Tap to enter #</div><div class="sub">You can chart pitches first and enter him any time</div></button>' :
       '<div class="mcard"><div class="lab">Batting · ' + esc(teamName(b.side)) + ' · #' + (b.slot + 1) + ' hitter · PA ' + (b.col + 1) + '</div><div class="who">' + esc(pName(b.side, b.pid)) + '</div>' +
       '<div class="sub"><span class="hand">' + (b.hand === 'L' ? 'LHH' : 'RHH') + '</span>' + (bp.bats === 'S' ? ' switch' : '') + (done ? ' · ' + esc(done) : '') + '</div>' +
-      '<div class="act"><button class="btn" data-act="flipHand">Bats ' + (b.hand === 'L' ? 'R' : 'L') + '?</button><button class="btn" data-act="sub">Sub / PH / PR</button></div></div></div>';
+      '<div class="act"><button class="btn" data-act="flipHand">Bats ' + (b.hand === 'L' ? 'R' : 'L') + '?</button><button class="btn" data-act="sub">Sub / PH / PR</button></div></div>') + '</div>';
     h += '<div class="padwrap"><div class="padhint">Tap location · catcher’s view</div>' +
       (P.loc ? '<button class="btn small padclear" data-act="clearLoc">Clear spot</button>' : '') + padSVG(b.hand, S.cur ? S.cur.pitches : [], P.loc, true) + '</div>';
     // sequence chips
@@ -541,17 +545,38 @@
       spray: (pt) => { M.spray = pt; renderModal(); }
     });
   }
-  const FPOS = { 1: [50, 66], 2: [50, 95], 3: [71, 62], 4: [61, 49], 5: [29, 62], 6: [39, 49], 7: [19, 28], 8: [50, 16], 9: [81, 28] };
+  // Field drawn to scale: home at (70,104), K svg-units per foot, x = feet toward 1B side, y = feet toward CF
+  const FK = 92 / 380, FHX = 70, FHY = 104;
+  const fx = x => FHX + x * FK, fy = y => FHY - y * FK;
+  const FPOS = { // normal depth, in feet from home plate
+    1: [0, 60.5, 'P'], 2: [0, -12, 'C'], 3: [67.7, 86.7, '1B'], 4: [36.3, 145.5, '2B'], 5: [-67.7, 86.7, '3B'],
+    6: [-36.3, 145.5, 'SS'], 7: [-136, 256, 'LF'], 8: [0, 315, 'CF'], 9: [136, 256, 'RF']
+  };
   function fieldSVG(f, spray) {
-    let s = '<svg id="fieldsvg" viewBox="0 0 100 104">';
-    s += '<path d="M50,92 L4,46 A65,65 0 0,1 96,46 Z" fill="#e9f3e6" stroke="#9cbf94" stroke-width="0.8"/>';
-    s += '<polygon points="50,92 68,74 50,56 32,74" fill="#efe2cf" stroke="#c5ab84" stroke-width="0.6"/>';
-    if (spray) s += '<circle cx="' + (50 + spray.x * 50) + '" cy="' + (92 - spray.y * 92) + '" r="2.6" fill="#F1BE48" stroke="#15171a" stroke-width="0.6"/>';
-    Object.entries(FPOS).forEach(([n, [x, y]]) => {
-      const idx = f.indexOf(+n);
-      s += '<g data-act="fielder" data-v="' + n + '"><circle cx="' + x + '" cy="' + y + '" r="6.2" fill="' + (idx >= 0 ? '#9D2235' : '#fff') + '" stroke="#15171a" stroke-width="0.8"/>' +
-        '<text x="' + x + '" y="' + (y + 2.6) + '" font-size="7" font-weight="800" text-anchor="middle" fill="' + (idx >= 0 ? '#fff' : '#15171a') + '">' + n + '</text></g>';
+    const pt = (x, y) => fx(x).toFixed(2) + ',' + fy(y).toFixed(2);
+    let s = '<svg id="fieldsvg" viewBox="0 0 140 117">';
+    // outfield fence: 330 down the lines, 400 to center
+    const fence = []; for (let a = -45; a <= 45; a += 3) { const r = a * Math.PI / 180, d = 330 + 70 * Math.cos(2 * r); fence.push(pt(d * Math.sin(r), d * Math.cos(r))); }
+    s += '<polygon points="' + pt(0, 0) + ' ' + fence.join(' ') + '" fill="#dcebd6" stroke="#7fa874" stroke-width="0.9"/>';
+    const track = []; for (let a = -45; a <= 45; a += 3) { const r = a * Math.PI / 180, d = 330 + 70 * Math.cos(2 * r) - 14; track.push(pt(d * Math.sin(r), d * Math.cos(r))); }
+    s += '<polyline points="' + track.join(' ') + '" fill="none" stroke="#c7b48f" stroke-width="2.6" opacity=".6"/>';
+    // infield dirt: arc 95 ft from the mound between the foul lines
+    const dirt = [pt(0, 0), pt(90.2, 90.2)]; for (let a = 18; a <= 162; a += 6) { const r = a * Math.PI / 180; dirt.push(pt(95 * Math.cos(r), 60.5 + 95 * Math.sin(r))); } dirt.push(pt(-90.2, 90.2));
+    s += '<polygon points="' + dirt.join(' ') + '" fill="#e8d6b8" stroke="#c5ab84" stroke-width="0.5"/>';
+    s += '<polygon points="' + [pt(0, 12), pt(52, 63.6), pt(0, 115), pt(-52, 63.6)].join(' ') + '" fill="#cfe3c7"/>';
+    s += '<line x1="' + fx(0) + '" y1="' + fy(0) + '" x2="' + fx(233) + '" y2="' + fy(233) + '" stroke="#fff" stroke-width="0.6"/><line x1="' + fx(0) + '" y1="' + fy(0) + '" x2="' + fx(-233) + '" y2="' + fy(233) + '" stroke="#fff" stroke-width="0.6"/>';
+    s += '<circle cx="' + fx(0) + '" cy="' + fy(60.5) + '" r="' + (9 * FK) + '" fill="#e8d6b8" stroke="#c5ab84" stroke-width="0.4"/>';
+    [[63.6, 63.6], [0, 127.3], [-63.6, 63.6]].forEach(([x, y]) => { s += '<rect x="' + (fx(x) - 1.1) + '" y="' + (fy(y) - 1.1) + '" width="2.2" height="2.2" fill="#fff" stroke="#999" stroke-width="0.3" transform="rotate(45 ' + fx(x) + ' ' + fy(y) + ')"/>'; });
+    s += '<polygon points="' + [fx(-1.2) + ',' + fy(0.6), fx(1.2) + ',' + fy(0.6), fx(1.2) + ',' + fy(-0.4), fx(0) + ',' + fy(-1.4), fx(-1.2) + ',' + fy(-0.4)].join(' ') + '" fill="#fff" stroke="#555" stroke-width="0.3"/>';
+    if (spray && spray.xft != null) s += '<circle cx="' + fx(spray.xft) + '" cy="' + fy(spray.yft) + '" r="2.4" fill="#F1BE48" stroke="#15171a" stroke-width="0.6"/>';
+    Object.entries(FPOS).forEach(([n, [x, y, lab]]) => {
+      const on = f.indexOf(+n) >= 0, X = fx(x), Y = fy(y);
+      s += '<g data-act="fielder" data-v="' + n + '"><circle cx="' + X + '" cy="' + Y + '" r="8.5" fill="transparent"/>' +
+        '<circle cx="' + X + '" cy="' + Y + '" r="6" fill="' + (on ? '#9D2235' : '#fff') + '" stroke="#15171a" stroke-width="0.7"/>' +
+        '<text x="' + X + '" y="' + (Y + 1.2) + '" font-size="6" font-weight="800" text-anchor="middle" fill="' + (on ? '#fff' : '#15171a') + '">' + n + '</text>' +
+        '<text x="' + X + '" y="' + (Y + 4.3) + '" font-size="2.3" font-weight="700" text-anchor="middle" fill="' + (on ? '#fff' : '#555') + '">' + lab + '</text></g>';
     });
+    if (f.length) s += '<text x="4" y="9" font-size="5" font-weight="800" fill="#15171a">' + f.join('-') + '</text>';
     return s + '</svg>';
   }
 
@@ -620,7 +645,7 @@
     const cands = () => {
       const side = M.side, used = S.pitchersUsed[side];
       const list = [];
-      used.forEach(pid => list.push({ pid, label: pName(side, pid), sub: (S.pitchCount[pid] || 0) + ' P · already pitched' }));
+      used.forEach(pid => { if (!unknown(pid)) list.push({ pid, label: pName(side, pid), sub: (S.pitchCount[pid] || 0) + ' P · already pitched' }); });
       if (side === g.sjfSide) Store.roster().filter(r => r.pitcher).forEach(r => {
         const id = (side === 'home' ? 'h' : 'a') + r.num; if (!list.find(x => x.pid === id)) list.push({ pid: id, label: '#' + r.num + ' ' + (r.name || ''), sub: (r.throws === 'L' ? 'LHP' : 'RHP'), roster: r });
       });
@@ -807,6 +832,52 @@
     });
   }
 
+  // fill in an unknown starter (lineup spot or starting pitcher) — changes the game's starting lineup,
+  // so every pitch already charted for that spot is credited to him
+  function openFill(side, slot) {
+    const g = App.game, S = App.S, isP = slot === 'P';
+    const pref = side === 'home' ? 'h' : 'a';
+    const M = { num: '', name: '', hand: 'R', nameEdited: false };
+    const lookup = () => {
+      if (!M.num) return null;
+      const id = pref + M.num;
+      if (g[side].players[id]) return g[side].players[id];
+      if (side === g.sjfSide) return Store.roster().find(r => String(r.num) === M.num) || null;
+      const o = Store.opps()[(g[side].name || '').trim().toUpperCase()];
+      return o ? o.players.find(p => String(p.num) === M.num) || null : null;
+    };
+    const apply = () => { const f = lookup(); if (f) { if (!M.nameEdited) M.name = f.name || ''; M.hand = isP ? (f.throws || 'R') : (f.bats || 'R'); } else if (!M.nameEdited) { M.name = ''; } };
+    const err = () => {
+      if (!M.num) return 'Enter his number';
+      if (!isP) { const id = pref + M.num; const at = S.lineup[side].indexOf(id); if (at >= 0 && at !== slot) return '#' + M.num + ' is already batting ' + (at + 1) + E.ordinal(at + 1); }
+      return '';
+    };
+    openModal({
+      title: isP ? 'Who’s pitching for ' + g[side].name + '?' : g[side].name + ' — #' + (slot + 1) + ' hitter',
+      body: () => {
+        const f = lookup();
+        return '<div class="kdisp">#' + (M.num || '—') + '</div>' + (f && f.name ? '<div style="text-align:center;font-weight:800;margin:-6px 0 8px">' + esc(f.name) + ' (' + (g[side].players[pref + M.num] ? 'already in this game' : side === g.sjfSide ? 'from roster' : 'from earlier games') + ')</div>' : '') +
+          '<div class="keypad">' + [1, 2, 3, 4, 5, 6, 7, 8, 9, 'C', 0, '⌫'].map(k => '<button class="btn" data-act="fk" data-v="' + k + '">' + k + '</button>').join('') + '</div>' +
+          '<div class="row" style="margin-top:14px;justify-content:center"><span class="f" style="font-weight:800">' + (isP ? 'Throws' : 'Bats') + '</span>' + seg('fH', isP ? [['R', 'RHP'], ['L', 'LHP']] : [['R', 'R'], ['L', 'L'], ['S', 'Switch']], M.hand) + '</div>' +
+          '<div style="max-width:360px;margin:12px auto 0"><input class="txt" placeholder="Name (optional)" value="' + esc(M.name) + '" data-chg="fName"></div>';
+      },
+      foot: () => { const e = err(); return '<div class="err grow">' + esc(e) + '</div><button class="btn primary" data-act="fSave" ' + (e ? 'disabled' : '') + '>Save</button>'; },
+      acts: {
+        fk: el => { const k = el.dataset.v; if (k === 'C') M.num = ''; else if (k === '⌫') M.num = M.num.slice(0, -1); else if (M.num.length < 2) M.num += k; apply(); renderModal(); },
+        fH: el => { M.hand = el.dataset.v; renderModal(); },
+        fSave: () => {
+          if (err()) return;
+          const id = pref + M.num; const ex = g[side].players[id] || {}; const f = lookup() || {};
+          g[side].players[id] = Object.assign({ id, num: M.num, bats: 'R', throws: 'R', ot: f.ot || '', note: f.note || '' }, ex, { name: M.name.trim() || ex.name || f.name || '' },
+            isP ? { throws: M.hand, bats: ex.bats || f.bats || 'R' } : { bats: M.hand, throws: ex.throws || f.throws || 'R' });
+          if (isP) g[side].pitcher = id; else g[side].lineup[slot] = id;
+          closeModal(); afterChange(null, { quiet: true }); toast((isP ? 'Pitcher ' : 'Batting ' + (slot + 1) + E.ordinal(slot + 1) + ': ') + '#' + M.num + (M.name ? ' ' + M.name : ''));
+        }
+      },
+      chg: { fName: el => { M.name = el.value; M.nameEdited = true; } }
+    });
+  }
+
   function openNote() {
     const M = { text: '' };
     openModal({
@@ -897,9 +968,10 @@
     const col = side => {
       let h = '<div class="card"><h2>' + esc(g[side].name) + (side === g.sjfSide ? '' : '') + ' <span class="muted" style="font-size:14px">(' + side + ')</span></h2><table class="st">';
       S.slotHist[side].forEach((hist, i) => {
-        h += '<tr><td><b>' + (i + 1) + '.</b> ' + hist.map((x, j) => '<button class="btn small ' + (j === hist.length - 1 ? '' : 'ghost') + '" data-act="editPlayer" data-side="' + side + '" data-v="' + x.pid + '">' + (j ? esc(x.role) + ' ' : '') + esc(pName(side, x.pid)) + ' (' + (pl(side, x.pid).bats || 'R') + ')</button>').join(' ') + '</td></tr>';
+        h += '<tr><td><b>' + (i + 1) + '.</b> ' + hist.map((x, j) => unknown(x.pid) ? '<button class="btn small gold" data-act="fillSlot" data-side="' + side + '" data-slot="' + i + '">Enter #</button>' :
+          '<button class="btn small ' + (j === hist.length - 1 ? '' : 'ghost') + '" data-act="editPlayer" data-side="' + side + '" data-v="' + x.pid + '">' + (j ? esc(x.role) + ' ' : '') + esc(pName(side, x.pid)) + ' (' + (pl(side, x.pid).bats || 'R') + ')</button>').join(' ') + '</td></tr>';
       });
-      h += '</table><h3>Pitchers</h3><table class="st">' + S.pitchersUsed[side].map(pid => '<tr><td><button class="btn small" data-act="editPlayer" data-side="' + side + '" data-v="' + pid + '">' + esc(pName(side, pid)) + ' · ' + (pl(side, pid).throws === 'L' ? 'LHP' : 'RHP') + (pl(side, pid).ot ? ' · OT=' + esc(pl(side, pid).ot) : '') + '</button></td><td>' + (S.pitchCount[pid] || 0) + ' P</td></tr>').join('') + '</table>' +
+      h += '</table><h3>Pitchers</h3><table class="st">' + S.pitchersUsed[side].map(pid => unknown(pid) ? '<tr><td><button class="btn small gold" data-act="fillSlot" data-side="' + side + '" data-slot="P">Enter starting pitcher #</button></td><td>' + (S.pitchCount[pid] || 0) + ' P</td></tr>' : '<tr><td><button class="btn small" data-act="editPlayer" data-side="' + side + '" data-v="' + pid + '">' + esc(pName(side, pid)) + ' · ' + (pl(side, pid).throws === 'L' ? 'LHP' : 'RHP') + (pl(side, pid).ot ? ' · OT=' + esc(pl(side, pid).ot) : '') + '</button></td><td>' + (S.pitchCount[pid] || 0) + ' P</td></tr>').join('') + '</table>' +
         '<div class="row" style="margin-top:10px"><button class="btn small" data-act="pchangeSide" data-v="' + side + '">Pitching change</button></div></div>';
       return h;
     };
@@ -992,6 +1064,7 @@
     return '<div class="topbar"><button class="btn" data-act="goHome">‹ Games</button><h1>How to use</h1></div><div class="page help"><div class="card">' +
       '<h2>Every pitch</h2><ol><li>Tap the <b>pitch type</b> (1 FB, 2 CB, 3 SL, 4 CH, 5 OT, ? if you missed it).</li><li>Tap the <b>velo</b> (the row centers on that pitcher’s average for that pitch; # for anything else). Optional.</li><li>Tap the <b>location</b> on the zone (catcher’s view, like the sheet). Optional.</li><li>Tap the <b>result</b>. That saves the pitch and resets for the next one.</li></ol>' +
       '<p>Count, outs, innings, batting order, pitch counts and switching sides all happen automatically. Ball 4 is a walk, strike 3 is a strikeout (backwards K if called), and three outs flips to the other team.</p>' +
+      '<h2>No lineup yet?</h2><p>Start the game with blank spots (or a blank starting pitcher). When an unknown hitter comes up, his card turns gold — tap it and punch in his number when you see it. Pitches you already charted are credited to him. The Lineups tab shows any spots still blank.</p>' +
       '<h2>Ball in play</h2><p>Pick what happened, tap fielders in order (6 then 3 = 6-3), optionally tap the grass where it went, then check the runners. Default runner moves are filled in — change any that are wrong.</p>' +
       '<h2>Between pitches</h2><p><b>Runners</b> handles SB, CS, WP, PB, balk, pickoffs. <b>Pitching change</b> and <b>Sub / PH / PR</b> are on the cards up top. Switch hitters are set from the pitcher’s arm automatically; “Bats R?/L?” flips it.</p>' +
       '<h2>Mistakes</h2><p><b>Undo</b> steps back one action at a time (Redo appears right after). Tap a pitch chip — or any box on the <b>Sheet</b> — to change its type, velo, location, or called/swinging. <b>Fix</b> sets outs, count, runners, score or who’s up when the chart and the field disagree.</p>' +
@@ -1040,6 +1113,9 @@
     pchange: () => openPChange(), pchangeSide: el => openPChange(el.dataset.v),
     flipHand: () => { const b = curBatter(); commit({ t: 'bats', hand: b.hand === 'L' ? 'R' : 'L' }, { quiet: true }); },
     editPitch: el => openEditPitch(+el.dataset.ev),
+    fillBatter: el => openFill(el.dataset.side, +el.dataset.slot),
+    fillPitcher: el => openFill(el.dataset.side, 'P'),
+    fillSlot: el => openFill(el.dataset.side, el.dataset.slot === 'P' ? 'P' : +el.dataset.slot),
     openPA: el => openPA(el.dataset.id),
     d3: openD3,
     endGame: () => confirmBox('End game', 'Mark this game final? You can reopen it later.', 'End game', () => commit({ t: 'end' })),
@@ -1116,7 +1192,7 @@
     if (field && !e.target.closest('[data-act]') && App.modal && App.modal.spray) {
       const pt = field.createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY;
       const p = pt.matrixTransform(field.getScreenCTM().inverse());
-      App.modal.spray({ x: Math.round((p.x - 50) / 50 * 1000) / 1000, y: Math.round((92 - p.y) / 92 * 1000) / 1000 });
+      App.modal.spray({ xft: Math.round((p.x - FHX) / FK), yft: Math.round((FHY - p.y) / FK) });
     }
   });
   window.addEventListener('resize', () => { if (App.screen === 'game' && App.tab === 'sheet') drawSheet(); });
