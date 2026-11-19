@@ -44,7 +44,7 @@
       let S = null; try { S = root.Engine.replay(game); } catch (e) { /* */ }
       idx.push({
         id: game.id, date: game.date, home: game.home.name, away: game.away.name, sjfSide: game.sjfSide,
-        score: S ? S.score : null, status: game.status, updated: game.updated,
+        score: S ? S.score : null, status: game.status, updated: game.updated, mode: game.mode || 'full',
         inning: S ? (S.half === 'top' ? 'Top ' : 'Bot ') + S.inning : ''
       });
       this.saveError = null;

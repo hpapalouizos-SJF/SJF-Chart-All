@@ -76,7 +76,7 @@
     const rows = games.map(g => {
       const sc = g.score ? g.away + ' ' + g.score.away + ' @ ' + g.home + ' ' + g.score.home : g.away + ' @ ' + g.home;
       return '<div class="game-row"><div class="grow"><div class="t">' + esc(sc) + '</div><div class="muted">' + esc(R.fmtDate(g.date)) +
-        ' · <span class="pill ' + (g.status === 'final' ? '' : 'live') + '">' + (g.status === 'final' ? 'Final' : 'Live · ' + esc(g.inning)) + '</span></div></div>' +
+        ' · <span class="pill ' + (g.status === 'final' ? '' : 'live') + '">' + (g.status === 'final' ? 'Final' : 'Live · ' + esc(g.inning)) + '</span>' + (g.mode === 'call' ? ' <span class="pill" style="background:#fff7e0;color:#7a5a00">Pitch-calling</span>' : '') + '</div></div>' +
         '<button class="btn primary" data-act="openGame" data-id="' + g.id + '">Open</button>' +
         '<button class="btn small danger" data-act="delGame" data-id="' + g.id + '">Delete</button></div>';
     }).join('');
@@ -96,25 +96,28 @@
   // ================================================================== SETUP
   function blankLineup() { return Array.from({ length: 9 }, () => ({ num: '', name: '', bats: 'R' })); }
   function newSetup() {
-    return { date: today(), opp: '', sjfSide: 'home', innings: 9, lu: { sjf: blankLineup(), opp: blankLineup() }, p: { sjf: { num: '', name: '', throws: 'R' }, opp: { num: '', name: '', throws: 'R' } } };
+    return { mode: 'full', date: today(), opp: '', sjfSide: 'home', innings: 9, lu: { sjf: blankLineup(), opp: blankLineup() }, p: { sjf: { num: '', name: '', throws: 'R' }, opp: { num: '', name: '', throws: 'R' } } };
   }
   function setupHTML() {
     const s = App.setup, st = App.settings;
     const oppKeys = Object.values(Store.opps()).map(o => o.name);
+    const call = s.mode === 'call';
+    const pRow = (k) => '<div class="grp-lab">Starting pitcher</div><div class="row"><input class="txt num" style="width:70px" inputmode="numeric" placeholder="#" value="' + esc(s.p[k].num) + '" data-bind="p.' + k + '.num" data-lookp="' + k + '">' +
+      '<input class="txt grow" style="width:auto" placeholder="Name" value="' + esc(s.p[k].name) + '" data-bind="p.' + k + '.name">' + seg('setThrows', [['R', 'RHP'], ['L', 'LHP']], s.p[k].throws, 'data-k="' + k + '"') + '</div>';
     const lu = (k) => '<table class="lu">' + s.lu[k].map((r, i) =>
       '<tr><td class="n">' + (i + 1) + '</td><td><input class="txt num" inputmode="numeric" placeholder="#" value="' + esc(r.num) + '" data-bind="lu.' + k + '.' + i + '.num" data-look="' + k + '.' + i + '"></td>' +
       '<td><input class="txt" placeholder="Name" value="' + esc(r.name) + '" data-bind="lu.' + k + '.' + i + '.name"></td>' +
-      '<td>' + seg('setBats', [['R', 'R'], ['L', 'L'], ['S', 'S']], r.bats, 'data-k="' + k + '" data-i="' + i + '"') + '</td></tr>').join('') + '</table>' +
-      '<div class="grp-lab">Starting pitcher</div><div class="row"><input class="txt num" style="width:70px" inputmode="numeric" placeholder="#" value="' + esc(s.p[k].num) + '" data-bind="p.' + k + '.num" data-lookp="' + k + '">' +
-      '<input class="txt grow" style="width:auto" placeholder="Name" value="' + esc(s.p[k].name) + '" data-bind="p.' + k + '.name">' + seg('setThrows', [['R', 'RHP'], ['L', 'LHP']], s.p[k].throws, 'data-k="' + k + '"') + '</div>';
+      '<td>' + seg('setBats', [['R', 'R'], ['L', 'L'], ['S', 'S']], r.bats, 'data-k="' + k + '" data-i="' + i + '"') + '</td></tr>').join('') + '</table>' + pRow(k);
     return '<div class="topbar"><button class="btn" data-act="goHome">‹ Games</button><h1>New game</h1></div><div class="page">' +
+      '<div class="card" style="margin-bottom:14px"><label class="f">Chart type</label>' + seg('setMode', [['full', 'Full Synergy chart'], ['call', 'Pitch-calling chart']], s.mode) +
+      '<p class="muted" style="margin:8px 0 0">' + (call ? '<b>Pitch-calling:</b> charts their hitters only — pitch type, result, and where it went (no location or velo). Each hitter’s full breakdown is on screen before every at-bat. Still exports the Synergy chart of ' + esc(st.team) + ' pitching.' : '<b>Full chart:</b> both teams, with location and velo on every pitch.') + '</p></div>' +
       '<div class="card"><div class="row">' +
       '<div><label class="f">Date</label><input class="txt" type="date" value="' + esc(s.date) + '" data-bind="date"></div>' +
       '<div class="grow"><label class="f">Opponent</label><input class="txt" list="opplist" placeholder="e.g. ONU" value="' + esc(s.opp) + '" data-bind="opp" data-chg="oppPicked"><datalist id="opplist">' + oppKeys.map(o => '<option value="' + esc(o) + '">').join('') + '</datalist></div>' +
       '<div><label class="f">' + esc(st.team) + ' is</label>' + seg('setSide', [['home', 'Home'], ['away', 'Away']], s.sjfSide) + '</div>' +
       '<div><label class="f">Innings</label>' + seg('setInn', [[7, '7'], [9, '9']], s.innings) + '</div></div>' +
       '<div class="row" style="margin-top:10px"><button class="btn small" data-act="copyLast">Copy lineups from last game vs this opponent</button><button class="btn small" data-act="fillRoster">Fill ' + esc(st.team) + ' names from roster</button></div></div>' +
-      '<div class="setup-grid" style="margin-top:14px"><div class="card"><h2>' + esc(st.team) + ' lineup</h2>' + lu('sjf') + '</div>' +
+      '<div class="setup-grid" style="margin-top:14px"><div class="card"><h2>' + esc(st.team) + (call ? ' pitching' : ' lineup') + '</h2>' + (call ? '<p class="muted">Pitch-calling charts only their hitters, so no ' + esc(st.team) + ' lineup is needed.</p>' + pRow('sjf') : lu('sjf')) + '</div>' +
       '<div class="card"><h2 id="oppHead">' + esc(s.opp || 'Opponent') + ' lineup</h2>' + lu('opp') + '</div></div>' +
       '<p class="muted"><b>Don’t have a lineup yet?</b> Leave any spots (or the starting pitcher) blank and start the game — the app asks for each hitter’s number the first time he comes up. Names fill in automatically from your roster and from past games against the same team. Switch hitters (S) are charted from the side they bat against each pitcher.</p>' +
       '<div class="row" style="margin:10px 0 40px"><div class="grow"></div><button class="btn primary" data-act="startGame" style="font-size:20px;min-height:62px;padding:0 34px">Start game ›</button></div></div>';
@@ -162,7 +165,7 @@
         return id;
       };
       // blank spots stay unknown (null) and get filled in as each hitter comes up
-      const lineup = s.lu[k].map(r => (String(r.num).trim() ? add(r.num, { name: r.name.trim(), bats: r.bats }) : null));
+      const lineup = (k === 'sjf' && s.mode === 'call') ? Array(9).fill(null) : s.lu[k].map(r => (String(r.num).trim() ? add(r.num, { name: r.name.trim(), bats: r.bats }) : null));
       let pid = '?' + pref; // unknown starting pitcher until someone enters him
       if (String(s.p[k].num).trim()) {
         pid = pref + String(s.p[k].num).trim();
@@ -173,6 +176,7 @@
     };
     const sides = {}; sides[sjfSide] = mk('sjf', sjfSide); sides[oppSide] = mk('opp', oppSide);
     const g = E.newGame({ date: s.date, innings: s.innings, sjfSide, home: sides.home, away: sides.away });
+    g.mode = s.mode === 'call' ? 'call' : 'full';
     Store.saveOpp(s.opp, Object.values(sides[oppSide].players).map(p => ({ num: p.num, name: p.name, bats: p.bats, throws: p.throws })));
     Store.save(g);
     openGame(g.id);
@@ -184,7 +188,7 @@
     if (!g) { toast('Could not open that game'); return; }
     App.game = g; App.S = E.replay(g); App.redo = []; App.banner = null; App.tab = 'chart';
     App.pend = { type: null, velo: null, loc: null };
-    App.sheetSide = null; App.statsSide = g.sjfSide; App.sheetPage = 0;
+    App.sheetSide = g.mode === 'call' ? g.sjfSide : null; App.statsSide = g.sjfSide; App.sheetPage = 0; App.ourRuns = 0;
     go('game');
     wakeLock();
   }
@@ -212,7 +216,9 @@
     App.banner = null;
     if (before && (before.half !== S.half || before.inning !== S.inning)) {
       const fs = E.fieldingSide(S), bs = E.battingSide(S);
-      App.banner = { cls: '', html: 'Side retired. ' + (S.half === 'top' ? 'Top ' : 'Bottom ') + S.inning + ': <b>' + esc(teamName(bs)) + '</b> batting, <b>' + esc(teamName(fs)) + '</b> pitching (' + esc(pName(fs, S.pitcher[fs])) + ', ' + (S.pitchCount[S.pitcher[fs]] || 0) + ' P)' };
+      App.banner = g.mode === 'call'
+        ? { cls: '', html: 'Side retired. ' + (S.half === 'top' ? 'Top ' : 'Bottom ') + S.inning + ': <b>' + esc(teamName(bs)) + '</b> batting.' }
+        : { cls: '', html: 'Side retired. ' + (S.half === 'top' ? 'Top ' : 'Bottom ') + S.inning + ': <b>' + esc(teamName(bs)) + '</b> batting, <b>' + esc(teamName(fs)) + '</b> pitching (' + esc(pName(fs, S.pitcher[fs])) + ', ' + (S.pitchCount[S.pitcher[fs]] || 0) + ' P)' };
       if (S.inning > g.innings && S.half === 'top' && S.score.home !== S.score.away) App.banner.html += ' &nbsp;<button class="btn small gold" data-act="endGame">End game</button>';
       if (S.inning >= g.innings && S.half === 'bottom' && S.score.home > S.score.away) App.banner.html += ' &nbsp;Home team leads — <button class="btn small gold" data-act="endGame">End game</button>';
     }
@@ -271,7 +277,7 @@
       '<button class="btn" data-act="undo">↶ Undo</button></div>';
     if (App.banner && App.tab === 'chart') html += '<div class="banner ' + App.banner.cls + '">' + App.banner.html + '</div>';
     if (S.warnings.length && App.tab === 'chart') html += '<div class="banner red">Check: ' + esc(S.warnings[S.warnings.length - 1]) + ' — use Undo or Fix.</div>';
-    if (App.tab === 'chart') html += chartTabHTML();
+    if (App.tab === 'chart') html += (g.mode === 'call' ? callChartHTML() : chartTabHTML());
     else if (App.tab === 'sheet') html += sheetTabHTML();
     else if (App.tab === 'stats') html += statsTabHTML();
     else if (App.tab === 'lineups') html += lineupsTabHTML();
@@ -358,6 +364,76 @@
       '<button class="btn" data-act="tab" data-v="sheet">View sheet</button></div></div>';
     h += '</section></div>';
     return h;
+  }
+  // ------------------------------------------------------------------ pitch-calling chart
+  function callChartHTML() {
+    const g = App.game, S = App.S, P = App.pend;
+    const bs = E.battingSide(S), fs = E.fieldingSide(S), all = !!App.scoutAll;
+    const opp = E.other(g.sjfSide);
+    if (bs === g.sjfSide && !S.final) {
+      // our half-inning: nothing to chart; get ready for who's due up
+      const due = [0, 1, 2].map(i => (S.nextSlot[opp] + i) % 9);
+      return '<div class="chart callgrid"><section class="scoutcol"><div class="card">' +
+        '<div class="lab muted" style="font-weight:800;text-transform:uppercase;font-size:12px;letter-spacing:.06em">' + (S.half === 'top' ? 'Top ' : 'Bottom ') + S.inning + '</div>' +
+        '<h2 style="margin:4px 0 6px">' + esc(g[g.sjfSide].name) + ' batting — nothing to chart</h2>' +
+        '<p class="muted">When they come back up, tap the button. Add our runs this half if you want the score right.</p>' +
+        '<div class="row"><span style="font-weight:800">Our runs this half</span><button class="btn small" data-act="ourRuns" data-d="-1">−</button><b style="font-size:26px;min-width:34px;text-align:center">' + (App.ourRuns || 0) + '</b><button class="btn small" data-act="ourRuns" data-d="1">+</button></div>' +
+        '<div class="row" style="margin-top:14px"><button class="btn primary" data-act="theirHalf" style="min-height:70px;font-size:20px;flex:1">' + esc(g[opp].name) + ' hitting — ' + (S.half === 'top' ? 'Bottom ' + S.inning : 'Top ' + (S.inning + 1)) + ' ›</button></div>' +
+        (S.inning >= g.innings && S.half === 'bottom' ? '<div class="row" style="margin-top:10px"><button class="btn gold" data-act="endGame">End game</button></div>' : '') +
+        '</div></section><section class="scoutcol">' +
+        due.map((slot, i) => Scout.deckHTML(g, S, opp, S.lineup[opp][slot], slot, all, i === 0 ? 'Leading off' : i === 1 ? 'Then' : 'Then')).join('') +
+        '<div class="row" style="margin-top:8px"><div class="seg"><button data-act="scoutAll" data-v="0" class="' + (all ? '' : 'on') + '">Today</button><button data-act="scoutAll" data-v="1" class="' + (all ? 'on' : '') + '">All games</button></div></div>' +
+        '</section></div>';
+    }
+    const b = curBatter();
+    const pid = S.pitcher[fs], pp = pl(fs, pid);
+    const otLab = pp.ot ? pp.ot : 'OT';
+    const deckSlot = (b.slot + 1) % 9;
+    let h = '<div class="chart callgrid"><section class="scoutcol">';
+    h += Scout.panelHTML(g, S, b.side, b.pid, b.slot, { all, hand: b.hand });
+    h += Scout.deckHTML(g, S, b.side, S.lineup[b.side][deckSlot], deckSlot, all, 'On deck');
+    h += '</section><section class="ctrl">';
+    // compact matchup row
+    h += '<div class="matchup">' +
+      (unknown(pid) ? '<button class="mcard" data-act="fillPitcher" data-side="' + fs + '" style="text-align:left;background:#fff7e0;border:2px solid var(--gold)"><div class="lab">Pitching</div><div class="who" style="font-size:17px">Who’s pitching? Tap to enter #</div></button>' :
+        '<div class="mcard"><div class="lab">Pitching</div><div class="who" style="font-size:18px">' + esc(pName(fs, pid)) + '</div><div class="sub"><b>' + (S.pitchCount[pid] || 0) + '</b> pitches</div><div class="act"><button class="btn" data-act="pchange">Change</button></div></div>') +
+      (unknown(b.pid) ? '<button class="mcard" data-act="fillBatter" data-side="' + b.side + '" data-slot="' + b.slot + '" style="text-align:left;background:#fff7e0;border:2px solid var(--gold)"><div class="lab">Batting ' + (b.slot + 1) + E.ordinal(b.slot + 1) + '</div><div class="who" style="font-size:17px">Who’s up? Tap to enter #</div><div class="sub">Chart pitches first if you need to</div></button>' :
+        '<div class="mcard"><div class="lab">Batting ' + (b.slot + 1) + E.ordinal(b.slot + 1) + ' · PA ' + (b.col + 1) + '</div><div class="who" style="font-size:18px">' + esc(pName(b.side, b.pid)) + ' <span class="hand">' + (b.hand === 'L' ? 'LHH' : 'RHH') + '</span></div>' +
+        '<div class="act"><button class="btn" data-act="flipHand">Bats ' + (b.hand === 'L' ? 'R' : 'L') + '?</button><button class="btn" data-act="sub">Sub</button></div></div>') + '</div>';
+    // this at-bat so far
+    h += '<div class="seq" style="margin-top:0">';
+    if (S.cur && (S.cur.pitches.length || S.cur.autos.length || S.cur.events.length)) {
+      S.cur.pitches.forEach(p => { h += '<button class="chip ' + (p.strike ? 's' : '') + '" data-act="editPitch" data-ev="' + p.evIdx + '"><span class="n">' + p.b + '-' + p.s + '</span><span style="color:' + TCOL[p.type] + '">' + TN[p.type] + '</span> · ' + shortRes(p.res) + '</button>'; });
+      S.cur.autos.forEach(a => { h += '<span class="chip">Auto ' + (a.res === 'B' ? 'ball' : 'strike') + '</span>'; });
+      S.cur.events.forEach(ev => { h += '<span class="chip">' + esc(ev.desc) + '</span>'; });
+      h += '<span class="chip" style="border-color:var(--ink)"><b>Count ' + S.balls + '-' + S.strikes + '</b></span>';
+    } else if (S.lastPA) {
+      const pa = S.lastPA;
+      h += '<button class="chip lastpa" data-act="openPA" data-id="' + pa.id + '">Last: ' + esc(pName(pa.side, pa.batter)) + ' — ' + esc(paText(pa)) + ' · tap to review</button>';
+    } else h += '<span class="muted">This at-bat’s pitches show here. Tap one to fix it.</span>';
+    h += '</div>';
+    h += '<div class="types" id="types">' + [1, 2, 3, 4, 5, 0].map(t =>
+      '<button class="tbtn ' + (P.type === t ? 'on' : '') + '" style="--c:' + TCOL[t] + '" data-act="ptype" data-v="' + t + '">' + (t ? t : '?') + '<small>' + (t === 5 ? esc(otLab) : t ? TN[t] : 'missed') + '</small></button>').join('') + '</div>';
+    h += '<div class="results">' +
+      '<button class="rbtn ball" data-act="res" data-v="B">Ball</button>' +
+      '<button class="rbtn cs" data-act="res" data-v="CS">Called<small>strike</small></button>' +
+      '<button class="rbtn sw" data-act="res" data-v="SW">Swing &amp; miss</button>' +
+      '<button class="rbtn foul" data-act="res" data-v="F">Foul</button>' +
+      '<button class="rbtn ip" data-act="res" data-v="IP">In play</button>' +
+      '<button class="rbtn hbp" data-act="res" data-v="HBP">HBP</button></div>';
+    h += '<div class="results2">' +
+      '<button class="btn" data-act="res" data-v="FT">Foul tip</button>' +
+      '<button class="btn" data-act="res" data-v="FB">Foul bunt</button>' +
+      '<button class="btn" data-act="res" data-v="MB">Missed bunt</button>' +
+      '<button class="btn" data-act="auto" data-v="B">Auto ball</button>' +
+      '<button class="btn" data-act="auto" data-v="S">Auto strike</button>' +
+      '<button class="btn" data-act="ibb">IBB</button></div>';
+    h += '<div class="bottomrow"><div class="diamond" data-act="runner">' + diamondSVG() + '</div><div class="evbtns">' +
+      '<button class="btn" data-act="runner">Runners: SB · WP · PB · BK · PO…</button>' +
+      '<button class="btn" data-act="fix">Fix outs / count / bases</button>' +
+      '<button class="btn" data-act="note">Add note</button>' +
+      '<button class="btn" data-act="tab" data-v="sheet">View sheet</button></div></div>';
+    return h + '</section></div>';
   }
   function shortRes(r) { return { B: 'Ball', CS: 'Called', SW: 'Whiff', F: 'Foul', FT: 'Foul tip', FB: 'Foul bunt', MB: 'Miss bunt', IP: 'In play', HBP: 'HBP' }[r] || r; }
 
@@ -909,7 +985,7 @@
     const side = App.sheetSide || E.fieldingSide(S);
     const pages = R.chartPages(S, side);
     if (App.sheetPage >= pages) App.sheetPage = 0;
-    return '<div class="sheetwrap"><div class="row" style="margin-bottom:10px">' + seg('sheetSide', [['away', esc(g.away.name) + ' pitching'], ['home', esc(g.home.name) + ' pitching']], side) +
+    return '<div class="sheetwrap"><div class="row" style="margin-bottom:10px">' + (g.mode === 'call' ? '<b>' + esc(g[g.sjfSide].name) + ' pitching</b>' : seg('sheetSide', [['away', esc(g.away.name) + ' pitching'], ['home', esc(g.home.name) + ' pitching']], side)) +
       (pages > 1 ? seg('sheetPage', Array.from({ length: pages }, (_, i) => [i, 'Page ' + (i + 1)]), App.sheetPage) : '') +
       '<span class="muted">Tap any box to review or fix that at-bat. This is exactly what exports for Synergy.</span></div>' +
       '<canvas class="sheetcv" id="sheetcv"></canvas></div>';
@@ -1001,11 +1077,12 @@
     const item = (act, t, d, extra) => '<div class="exp"><div class="grow"><div class="t">' + t + '</div><div class="d">' + d + '</div></div><button class="btn primary" data-act="' + act + '" ' + (extra || '') + '>Export</button></div>';
     return '<div class="page"><h2>Export</h2>' + (S.final ? '' : '<div class="banner" style="margin:0 0 12px">Game still in progress — you can export anytime; tap <b>End game</b> when it’s over.</div>') +
       '<div class="explist">' +
+      (g.mode === 'call' ? item('exChart', 'Synergy chart — ' + esc(g[g.sjfSide].name) + ' pitching', 'PDF in the same layout as the paper chart: pitch sequence, swings, results and where each ball went. Upload to Video Express → Pitch Chart Upload.', 'data-v="' + g.sjfSide + '"') :
       item('exChart', 'Synergy chart — ' + esc(g.away.name) + ' pitching', 'PDF in the same layout as the paper chart. Upload to Video Express → Pitch Chart Upload.', 'data-v="away"') +
-      item('exChart', 'Synergy chart — ' + esc(g.home.name) + ' pitching', 'PDF in the same layout as the paper chart.', 'data-v="home"') +
+      item('exChart', 'Synergy chart — ' + esc(g.home.name) + ' pitching', 'PDF in the same layout as the paper chart.', 'data-v="home"')) +
       item('exCSV', 'Pitch-by-pitch CSV', 'Every pitch, both teams: type, velo, location, count, result, runners. Synergy also accepts CSV; opens in Excel / Sheets.') +
       item('exReport', 'Staff report — ' + esc(g[g.sjfSide].name) + ' pitchers', 'One page: pillars (0-0 strikes, leadoff outs, spin, chase/whiff, free bases), pitcher lines and pitch mix.') +
-      item('exAll', 'Everything at once', 'Both chart PDFs + CSV + staff report.') +
+      item('exAll', 'Everything at once', (g.mode === 'call' ? 'Chart PDF' : 'Both chart PDFs') + ' + CSV + staff report.') +
       item('exBackup', 'Game backup (.json)', 'Keeps the full game so it can be restored or moved to another iPad.') +
       '</div><p class="muted">Exports open the iPad share sheet — choose <b>Save to Files</b>, <b>AirDrop</b> (works with no internet) or <b>Mail</b>.</p>' +
       '<div class="row" style="margin-top:18px">' + (S.final ? '<button class="btn" data-act="reopen">Reopen game</button>' : '<button class="btn gold" data-act="endGame">End game (final)</button>') + '</div></div>';
@@ -1016,7 +1093,7 @@
       if (kind === 'chart') files.push(X.chartPDF(g, S, v));
       if (kind === 'csv') files.push(X.csv(g, S));
       if (kind === 'report') files.push(X.reportPDF(g, S, App.settings));
-      if (kind === 'all') { files.push(X.chartPDF(g, S, 'away'), X.chartPDF(g, S, 'home'), X.csv(g, S), X.reportPDF(g, S, App.settings)); }
+      if (kind === 'all') { if (g.mode === 'call') files.push(X.chartPDF(g, S, g.sjfSide)); else files.push(X.chartPDF(g, S, 'away'), X.chartPDF(g, S, 'home')); files.push(X.csv(g, S), X.reportPDF(g, S, App.settings)); }
       if (kind === 'backup') files.push(X.backup(g));
       const r = await X.deliver(files);
       if (r === 'downloaded') toast('Saved ' + files.length + ' file' + (files.length > 1 ? 's' : ''));
@@ -1064,6 +1141,7 @@
     return '<div class="topbar"><button class="btn" data-act="goHome">‹ Games</button><h1>How to use</h1></div><div class="page help"><div class="card">' +
       '<h2>Every pitch</h2><ol><li>Tap the <b>pitch type</b> (1 FB, 2 CB, 3 SL, 4 CH, 5 OT, ? if you missed it).</li><li>Tap the <b>velo</b> (the row centers on that pitcher’s average for that pitch; # for anything else). Optional.</li><li>Tap the <b>location</b> on the zone (catcher’s view, like the sheet). Optional.</li><li>Tap the <b>result</b>. That saves the pitch and resets for the next one.</li></ol>' +
       '<p>Count, outs, innings, batting order, pitch counts and switching sides all happen automatically. Ball 4 is a walk, strike 3 is a strikeout (backwards K if called), and three outs flips to the other team.</p>' +
+      '<h2>Pitch-calling chart</h2><p>At <b>New game</b> pick <b>Pitch-calling chart</b>. It charts only their hitters — pitch type, result, and (on balls in play) the play and where it went; no location or velo. The left side of the screen is the hitter’s breakdown, always open: first-pitch swings, every swing-and-miss with the count, what he did with 2 strikes, what he put in play and where (spray chart), a pitch-by-pitch line for every at-bat, and a preview of the on-deck hitter. <b>All games</b> adds every earlier game we charted against him (same team + number). When we hit, the screen shows who’s due up; tap <b>[Team] hitting ›</b> when they come back up.</p>' +
       '<h2>No lineup yet?</h2><p>Start the game with blank spots (or a blank starting pitcher). When an unknown hitter comes up, his card turns gold — tap it and punch in his number when you see it. Pitches you already charted are credited to him. The Lineups tab shows any spots still blank.</p>' +
       '<h2>Ball in play</h2><p>Pick what happened, tap fielders in order (6 then 3 = 6-3), optionally tap the grass where it went, then check the runners. Default runner moves are filled in — change any that are wrong.</p>' +
       '<h2>Between pitches</h2><p><b>Runners</b> handles SB, CS, WP, PB, balk, pickoffs. <b>Pitching change</b> and <b>Sub / PH / PR</b> are on the cards up top. Switch hitters are set from the pitcher’s arm automatically; “Bats R?/L?” flips it.</p>' +
@@ -1114,6 +1192,15 @@
     flipHand: () => { const b = curBatter(); commit({ t: 'bats', hand: b.hand === 'L' ? 'R' : 'L' }, { quiet: true }); },
     editPitch: el => openEditPitch(+el.dataset.ev),
     fillBatter: el => openFill(el.dataset.side, +el.dataset.slot),
+    scoutAll: el => { App.scoutAll = el.dataset.v === '1'; render(); },
+    setMode: el => { App.setup.mode = el.dataset.v; render(); },
+    ourRuns: el => { App.ourRuns = Math.max(0, (App.ourRuns || 0) + +el.dataset.d); render(); },
+    theirHalf: () => {
+      const g = App.game, S = App.S, before = S;
+      if (App.ourRuns) { const sc = { home: S.score.home, away: S.score.away }; sc[g.sjfSide] += App.ourRuns; g.events.push({ t: 'fix', score: sc, ts: Date.now() }); }
+      g.events.push({ t: 'half', ts: Date.now() });
+      App.ourRuns = 0; App.redo = []; afterChange(before, { quiet: true });
+    },
     fillPitcher: el => openFill(el.dataset.side, 'P'),
     fillSlot: el => openFill(el.dataset.side, el.dataset.slot === 'P' ? 'P' : +el.dataset.slot),
     openPA: el => openPA(el.dataset.id),

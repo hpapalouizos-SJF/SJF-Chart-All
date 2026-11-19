@@ -37,6 +37,9 @@ For each pitch: **pitch type → velo → tap location → result**.
 
 Every so often, go to the home screen and tap **Back up everything**.
 
+## Pitch-calling chart
+At **New game**, pick **Pitch-calling chart** to chart only their hitters (pitch type, result, where it went). Each hitter's full breakdown stays on screen before and during every at-bat, with the on-deck hitter below. **All games** adds earlier games against him. It still exports the Synergy chart of SJF pitching.
+
 ## Bullpens
 Home → **Bullpens** → **+ New bullpen**. Pick one pitcher, or two to chart side-by-side mounds, then choose **Pen script** or **Free pen**. For each pitch: pitch type (it stays selected) → target → velo → tap where it landed → **Strike** or **Ball**. **Pitcher history** shows every pen and the trends. **PDF of the day** puts every pitcher's sheet in one file.
 
