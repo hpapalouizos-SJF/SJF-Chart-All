@@ -146,7 +146,9 @@
 
     // legend
     const lgY = L.top - 8;
-    P.text('Pitch # (1-5) in B or S row · circled = swing/bunt · filled = swing & miss · A = automatic ball/strike · V row = velo · dots = location (catcher view, # = pitch of AB, filled = strike) · bottom-right = pitcher pitch count · heavy line = end of inning',
+    P.text('Pitch # (1-5) in B or S row · circled = swing/bunt · filled = swing & miss · A = automatic ball/strike · V row = velo · dots = location (catcher view, # = pitch of AB, filled = strike) · bottom-right = pitcher pitch count',
+      L.x0, lgY - 7, { size: 4.9, color: '#333' });
+    P.text('Heavy line under a box = end of inning · batted ball: curved = fly/pop, straight = line drive, dotted = grounder/bunt · heavy base path = bases reached, shaded diamond = scored, x = out on the bases',
       L.x0, lgY, { size: 4.9, color: '#333' });
 
     // ---------- grid frame
@@ -226,13 +228,16 @@
     // zone box (always drawn, like the blank sheet)
     const zw = 22, zh = 27, zx = x + w - 27, zy = lowY + 31;
     P.rect(zx - zw / 2, zy - zh / 2, zw, zh, { lw: 0.8 });
-    // field arc + mini diamond
-    const R = 46; const arc = [];
-    for (let a = 0; a <= 90; a += 6) arc.push([x + R * Math.cos(a * Math.PI / 180), yb - R * Math.sin(a * Math.PI / 180)]);
+    // mini field: home plate in the bottom-left corner, 1st-base line along the bottom,
+    // 3rd-base line up the left side, fence arc centered on home, base paths always printed
+    const hx = x + 4, hy = yb - 4, d = FIELD.D, R = FIELD.R;
+    const arc = [];
+    for (let a = 0; a <= 90; a += 5) arc.push([hx + R * Math.cos(a * Math.PI / 180), hy - R * Math.sin(a * Math.PI / 180)]);
     P.poly(arc, { lw: 0.7 });
-    const d = 14, hx = x + 5, hy = yb - 5;
+    P.line(hx, hy, hx + R, hy, 0.4, '#888888'); P.line(hx, hy, hx, hy - R, 0.4, '#888888');
     const pts = [[hx, hy], [hx + d, hy], [hx + d, hy - d], [hx, hy - d], [hx, hy]];
-    P.rect(x, yb - 9, 9, 9, { lw: 0.4, stroke: '#777777' });
+    P.poly(pts, { lw: 0.45, stroke: '#9a9a9a' });
+    [[hx + d, hy], [hx + d, hy - d], [hx, hy - d]].forEach(([bx, by]) => P.rect(bx - 1, by - 1, 2, 2, { lw: 0.3, stroke: '#777777', fill: '#FFFFFF' }));
     if (!pa) return;
 
     const fsz = Math.min(7.2, cw * 0.95);
@@ -299,12 +304,12 @@
       const codes = pa.events.filter(ev => !ev.d3).map(ev => ({ POE: 'PO-E', ADV: 'ADV', OUT: 'RO' }[ev.kind] || ev.kind));
       P.text(fit(P, codes.join(' · '), 5.2, w - 50, true), x + 3, ny + 8, { size: 5.2, bold: true, color: '#333333' });
     }
-    // bases reached
-    if (pa.reach) {
-      for (let i = 0; i < Math.min(4, pa.reach); i++) P.line(pts[i][0], pts[i][1], pts[i + 1][0], pts[i + 1][1], 1.6);
-      if (pa.scored) P.rect(x, yb - 9, 9, 9, { fill: '#000000', lw: 0.4 });
-    }
-    if (pa.outOnBases) P.text('x', hx + d + 2, hy - d + 2, { size: 6, bold: true });
+    // where the ball went: curved = fly/pop, straight = liner, dotted = grounder/bunt
+    if (pa.complete && pa.result && pa.result.kind) drawBattedBall(P, pa.result, hx, hy, { x0: x + 1, x1: x + w - 1, y0: lowY + 1, y1: yb - 1 });
+    // bases reached: heavy line along the base paths; diamond filled in when he scored
+    if (pa.scored) P.rect(hx, hy - d, d, d, { fill: '#BBBBBB', stroke: null });
+    if (pa.reach) for (let i = 0; i < Math.min(4, pa.reach); i++) P.line(pts[i][0], pts[i][1], pts[i + 1][0], pts[i + 1][1], 1.8);
+    if (pa.outOnBases) P.text('x', hx + d + 2.5, hy - d - 1.5, { size: 6.5, bold: true });
     // pitcher's running pitch count
     const pc = pa.complete || pa.endedInning ? pa.pcAfter : S.pitchCount[pa.pitcher];
     if (pc != null) {
@@ -313,6 +318,50 @@
       P.text(t, x + w - 2, yb - 2.2, { size: 6.4, bold: true, align: 'right' });
     }
     if (opts.highlight && opts.highlight === pa.id) P.rect(x + 1, y + 1, w - 2, h - 2, { lw: 2, stroke: '#F1BE48' });
+  }
+
+  // ----- batted-ball lines on the mini field
+  // Real field in feet (x toward 1B side, y toward CF). Infield is enlarged so 2B lands exactly on the
+  // printed diamond; beyond 2B the scale shrinks so the 400-ft fence meets the arc.
+  const FIELD = { D: 20, R: 46 };
+  const FPOS_FT = { 1: [0, 60.5], 2: [0, -12], 3: [67.7, 86.7], 4: [36.3, 145.5], 5: [-67.7, 86.7], 6: [-36.3, 145.5], 7: [-136, 256], 8: [0, 315], 9: [136, 256] };
+  function fieldPt(hx, hy, xft, yft) {
+    const r2b = FIELD.D * Math.SQRT2, b = 127.28;
+    const dist = Math.hypot(xft, yft);
+    const rr = dist <= b ? dist * r2b / b : r2b + (dist - b) * (FIELD.R - r2b) / (400 - b);
+    const a = Math.PI / 4 - Math.atan2(xft, yft); // 0 = 1B line (right), 90° = 3B line (up)
+    return [hx + rr * Math.cos(a), hy - rr * Math.sin(a)];
+  }
+  function dashed(P, x1, y1, x2, y2, lw, on, off) {
+    const len = Math.hypot(x2 - x1, y2 - y1); if (!len) return;
+    const ux = (x2 - x1) / len, uy = (y2 - y1) / len;
+    for (let t = 0; t < len; t += on + off) { const e = Math.min(len, t + on); P.line(x1 + ux * t, y1 + uy * t, x1 + ux * e, y1 + uy * e, lw); }
+  }
+  function drawBattedBall(P, res, hx, hy, box) {
+    let end = null;
+    if (res.spray && res.spray.xft != null) end = [res.spray.xft, res.spray.yft];
+    else if (res.fielders && res.fielders.length && FPOS_FT[res.fielders[0]]) end = FPOS_FT[res.fielders[0]];
+    if (!end || (end[0] === 0 && end[1] < 0)) return; // nothing to draw (or a ball to the catcher)
+    let [ex, ey] = fieldPt(hx, hy, end[0], end[1]);
+    ex = Math.max(box.x0, Math.min(box.x1, ex)); ey = Math.max(box.y0, Math.min(box.y1, ey));
+    const bb = res.bb;
+    if (bb === 'FB' || bb === 'PU') {
+      // fly ball / pop up: arc bowed up and to the left of the straight path
+      const mx = (hx + ex) / 2, my = (hy + ey) / 2, len = Math.hypot(ex - hx, ey - hy);
+      let nx = (ey - hy) / (len || 1), ny = -(ex - hx) / (len || 1);
+      // bow toward center field so balls down either line stay inside the box
+      const ang = Math.atan2(hy - ey, ex - hx); // 0 = 1B line, PI/2 = 3B line
+      if ((ang > Math.PI / 4 && nx < 0) || (ang <= Math.PI / 4 && ny > 0)) { nx = -nx; ny = -ny; }
+      const k = len * (bb === 'PU' ? 0.45 : 0.28);
+      const cxp = Math.max(box.x0, Math.min(box.x1, mx + nx * k)), cyp = Math.max(box.y0, Math.min(box.y1, my + ny * k));
+      const pts = []; for (let t = 0; t <= 1.0001; t += 0.08) { const u = 1 - t; pts.push([u * u * hx + 2 * u * t * cxp + t * t * ex, u * u * hy + 2 * u * t * cyp + t * t * ey]); }
+      P.poly(pts, { lw: 0.9 });
+    } else if (bb === 'GB' || bb === 'BU') {
+      dashed(P, hx, hy, ex, ey, 0.9, 1.3, 1.1);
+    } else {
+      P.line(hx, hy, ex, ey, 0.9); // line drive (or type not marked)
+    }
+    P.circle(ex, ey, 1.3, { fill: '#000000', stroke: null });
   }
 
   function drawSidebar(P, S, game, fside, x, y, w, h) {
