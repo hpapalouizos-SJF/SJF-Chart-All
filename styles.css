@@ -230,3 +230,8 @@ table.st td:first-child, table.st th:first-child { text-align: left; }
 .sc-deck { background: #fff; border: 1px solid var(--line); border-radius: 14px; padding: 10px 12px; }
 .sc-deck .who { font-size: 18px; font-weight: 900; margin: 2px 0; }
 .sc-deck .d { font-size: 14px; color: var(--ink2); margin-bottom: 4px; }
+
+.ooz { width: 100%; border: 2px dashed #b9bdc4; background: #fff; border-radius: 12px; min-height: 52px; font-size: 17px; font-weight: 800; color: var(--ink2); }
+.ooz small { font-weight: 600; font-size: 13px; }
+.ooz.on { border: 2px solid var(--red); background: #fdecef; color: var(--red); }
+.sc-chip .chs { font-size: 10px; font-weight: 900; text-transform: uppercase; background: var(--gold); color: #2a1d00; border-radius: 4px; padding: 0 4px; margin-left: 2px; }

@@ -40,18 +40,20 @@
   }
 
   function summarize(list) {
-    const s = { pa: 0, ab: list.length, fp: 0, fpSwing: 0, fpDetail: [], by: {}, whiffs: [], twoK: { seen: 0, whiff: 0, foul: 0, take: 0, inPlay: 0 }, outPitches: [], bip: [], hits: 0, k: 0, bb: 0 };
+    const s = { pa: 0, ab: list.length, fp: 0, fpSwing: 0, fpDetail: [], by: {}, whiffs: [], chases: [], ballsTaken: 0, twoK: { seen: 0, whiff: 0, foul: 0, take: 0, inPlay: 0 }, outPitches: [], bip: [], hits: 0, k: 0, bb: 0 };
     list.forEach(({ pa }) => {
       if (pa.complete) s.pa++;
       const ps = pa.pitches;
       if (ps.length) {
         s.fp++;
         const f = ps[0]; if (f.offered) s.fpSwing++;
-        s.fpDetail.push({ type: f.type, res: f.res });
+        s.fpDetail.push({ type: f.type, res: f.res, chase: f.chase });
       }
       ps.forEach((p, i) => {
-        const b = (s.by[p.type] = s.by[p.type] || { seen: 0, swing: 0, whiff: 0, foul: 0, take: 0, cs: 0, ip: 0, hit: 0 });
+        const b = (s.by[p.type] = s.by[p.type] || { seen: 0, swing: 0, whiff: 0, foul: 0, take: 0, cs: 0, ip: 0, hit: 0, chase: 0 });
         b.seen++;
+        if (p.chase) { b.chase++; s.chases.push({ type: p.type, count: p.b + '-' + p.s, res: p.res }); }
+        if (p.res === 'B') s.ballsTaken++;
         if (p.offered) b.swing++;
         if (p.whiff) { b.whiff++; s.whiffs.push({ type: p.type, count: p.b + '-' + p.s }); }
         if (p.res === 'F' || p.res === 'FB') b.foul++;
@@ -90,7 +92,7 @@
     if (p.whiff) cls += ' wh'; else if (p.res === 'IP') cls += ' ip'; else if (p.res === 'CS') cls += ' cs'; else if (p.offered) cls += ' sw';
     let lab = resShort[p.res] || p.res;
     if (p.res === 'IP' && isLast && pa.result) lab = pa.result.notation || 'In play';
-    return '<span class="' + cls + '"><span class="ct">' + p.b + '-' + p.s + '</span><b style="color:' + (p.whiff || p.res === 'IP' ? '#fff' : col) + '">' + TS[p.type] + '</b> ' + esc(lab) + '</span>';
+    return '<span class="' + cls + '"><span class="ct">' + p.b + '-' + p.s + '</span><b style="color:' + (p.whiff || p.res === 'IP' ? '#fff' : col) + '">' + TS[p.type] + '</b> ' + esc(lab) + (p.chase ? '<span class="chs">chase</span>' : '') + '</span>';
   }
   function pct(n, d) { return d ? Math.round(100 * n / d) + '%' : '—'; }
 
@@ -133,8 +135,8 @@
   function byTypeTable(s) {
     const types = [1, 3, 2, 4, 5, 0].filter(t => s.by[t]);
     if (!types.length) return '';
-    return '<table class="sc-tab"><tr><th></th><th>Seen</th><th>Swing</th><th>Whiff</th><th>Foul</th><th>Took K</th><th>In play</th><th>Hits</th></tr>' +
-      types.map(t => { const b = s.by[t]; return '<tr><td style="color:' + TCOL[t] + ';font-weight:900">' + TS[t] + '</td><td>' + b.seen + '</td><td>' + b.swing + '</td><td class="' + (b.whiff ? 'hl' : '') + '">' + b.whiff + '</td><td>' + b.foul + '</td><td>' + b.cs + '</td><td>' + b.ip + '</td><td class="' + (b.hit ? 'hl2' : '') + '">' + b.hit + '</td></tr>'; }).join('') + '</table>';
+    return '<table class="sc-tab"><tr><th></th><th>Seen</th><th>Swing</th><th>Chase</th><th>Whiff</th><th>Foul</th><th>Took K</th><th>In play</th><th>Hits</th></tr>' +
+      types.map(t => { const b = s.by[t]; return '<tr><td style="color:' + TCOL[t] + ';font-weight:900">' + TS[t] + '</td><td>' + b.seen + '</td><td>' + b.swing + '</td><td class="' + (b.chase ? 'hl' : '') + '">' + b.chase + '</td><td class="' + (b.whiff ? 'hl' : '') + '">' + b.whiff + '</td><td>' + b.foul + '</td><td>' + b.cs + '</td><td>' + b.ip + '</td><td class="' + (b.hit ? 'hl2' : '') + '">' + b.hit + '</td></tr>'; }).join('') + '</table>';
   }
   function countTypes(arr) { const m = {}; arr.forEach(x => { m[x.type] = (m[x.type] || 0) + 1; }); return Object.entries(m).sort((a, b) => b[1] - a[1]).map(([t, n]) => TS[t] + (n > 1 ? ' ×' + n : '')).join(', '); }
 
@@ -153,9 +155,12 @@
     if (!list.length) return h + '<div class="sc-empty">First look' + (all ? ' — no earlier at-bats against us' : ' today — tap <b>All games</b> to check earlier games') + '.</div></div>';
     // quick read tiles
     const fpTxt = s.fp ? s.fpSwing + ' of ' + s.fp : '—';
-    const fpDetail = s.fpDetail.map(d => TS[d.type] + ' ' + (resShort[d.res] || d.res).toLowerCase()).join(', ');
+    const fpDetail = s.fpDetail.map(d => TS[d.type] + ' ' + (resShort[d.res] || d.res).toLowerCase() + (d.chase ? ' (chase)' : '')).join(', ');
+    const chD = s.chases.length + s.ballsTaken;
+    const chaseTile = '<div class="sc-tile ' + (s.chases.length ? 'warn' : '') + '"><div class="k">Chase</div><div class="v">' + s.chases.length + (chD ? ' <span style="font-size:14px;color:var(--ink2)">of ' + chD + ' out of zone · ' + Math.round(100 * s.chases.length / chD) + '%</span>' : '') + '</div><div class="d">' + esc(s.chases.map(c => TS[c.type] + ' ' + c.count + ' ' + ({ SW: 'whiff', F: 'foul', FT: 'foul tip', IP: 'in play' }[c.res] || '')).join(', ') || (chD ? 'took everything out of the zone' : 'none yet')) + '</div></div>';
     h += '<div class="sc-tiles">' +
       '<div class="sc-tile"><div class="k">1st pitch swing</div><div class="v">' + fpTxt + '</div><div class="d">' + esc(fpDetail) + '</div></div>' +
+      chaseTile +
       '<div class="sc-tile ' + (s.whiffs.length ? 'warn' : '') + '"><div class="k">Swing &amp; miss</div><div class="v">' + s.whiffs.length + '</div><div class="d">' + esc(s.whiffs.map(w => TS[w.type] + ' (' + w.count + ')').join(', ') || 'none yet') + '</div></div>' +
       '<div class="sc-tile"><div class="k">With 2 strikes</div><div class="v">' + (s.twoK.seen ? s.twoK.whiff + ' whiff / ' + s.twoK.foul + ' foul' : '—') + '</div><div class="d">' + (s.twoK.seen ? s.twoK.seen + ' pitches · ' + s.twoK.take + ' taken · ' + s.twoK.inPlay + ' in play' : 'never got to 2 strikes') + (s.outPitches.length ? ' · K on ' + esc(countTypes(s.outPitches)) : '') + '</div></div>' +
       '<div class="sc-tile ' + (s.hits ? 'hot' : '') + '"><div class="k">Results</div><div class="v">' + s.hits + ' H · ' + s.k + ' K · ' + s.bb + ' BB</div><div class="d">' + s.pa + ' PA' + (all ? ' (' + listToday.filter(x => x.pa.complete).length + ' today)' : '') + '</div></div></div>';
@@ -182,7 +187,7 @@
     h += '<div class="who">#' + esc(p.num) + ' ' + esc(p.name || '') + ' <span class="muted">(' + esc(p.bats || 'R') + ')</span></div>';
     if (!list.length) return h + '<div class="d">First look' + (all ? '' : ' today') + '</div></div>';
     h += '<div class="d"><b>' + esc(list.filter(x => x.pa.complete).map(x => resultText(x.pa).split(' · ')[0]).join(', ')) + '</b></div>' +
-      '<div class="d">1st pitch swing ' + s.fpSwing + '/' + s.fp + ' · whiffs: ' + esc(s.whiffs.map(w => TS[w.type]).join(', ') || 'none') + (s.bip.length ? ' · hit: ' + esc(s.bip.map(b => TS[b.type] + '→' + (b.res.notation || b.res.code)).join(', ')) : '') + '</div>';
+      '<div class="d">1st pitch swing ' + s.fpSwing + '/' + s.fp + (s.chases.length ? ' · chased: ' + esc(s.chases.map(c => TS[c.type]).join(', ')) : '') + ' · whiffs: ' + esc(s.whiffs.map(w => TS[w.type]).join(', ') || 'none') + (s.bip.length ? ' · in play: ' + esc(s.bip.map(b => TS[b.type] + '→' + (b.res.notation || b.res.code)).join(', ')) : '') + '</div>';
     const last = list[0];
     if (last) h += '<div class="sc-seq">' + last.pa.pitches.map((pp, i) => chip(pp, last.pa, i === last.pa.pitches.length - 1)).join('') + '</div>';
     return h + '</div>';

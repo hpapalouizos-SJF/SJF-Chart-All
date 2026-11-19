@@ -1,5 +1,5 @@
 /* Offline support: the whole app is cached on first visit, then runs with no internet. */
-const VERSION = 'sjf-chart-v1.4.0';
+const VERSION = 'sjf-chart-v1.5.0';
 const FILES = ['./', 'index.html', 'styles.css', 'app.js', 'engine.js', 'render.js', 'store.js', 'exports.js', 'pen.js', 'scout.js', 'logo.js',
   'jspdf.umd.min.js', 'manifest.webmanifest', 'icons/icon-180.png', 'icons/icon-192.png', 'icons/icon-512.png'];
 self.addEventListener('install', e => {

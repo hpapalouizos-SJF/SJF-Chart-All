@@ -15,6 +15,18 @@
   const CIRCLE_RES = ['SW', 'F', 'FT', 'FB', 'MB', 'IP']; // offered at (circled on the sheet)
   const ZONE_EDGE = 1.15; // ball center within 1.15 half-widths still touches the zone
   const HIT_CODES = ['1B', '2B', '3B', 'HR'];
+  const CHASE_RES = ['SW', 'F', 'FT', 'IP']; // swings that can be marked "out of zone"
+  // In/out of zone. Full chart: from the tapped location. Pitch-calling chart (no locations):
+  // a swing the caller marked "out of zone" is a chase, and a taken ball counts as out of the
+  // zone, so chase % = chases / (chases + balls taken).
+  function zoneFor(game, e) {
+    if (e.loc) return inZone(e.loc);
+    if (game.mode === 'call') {
+      if (e.ooz && CHASE_RES.includes(e.res)) return false;
+      if (e.res === 'B') return false;
+    }
+    return null;
+  }
   const SLOTS = 9;
 
   function uid() { return Math.random().toString(36).slice(2, 9) + Date.now().toString(36).slice(-5); }
@@ -227,7 +239,8 @@
           inning: S.inning, half: S.half, side, fside, paId: pa.id,
           strike: STRIKE_RES.includes(e.res), swing: SWING_RES.includes(e.res),
           offered: CIRCLE_RES.includes(e.res), whiff: e.res === 'SW' || e.res === 'FT',
-          zone: inZone(e.loc), spray: e.ip && e.ip.spray || null, bb: e.ip && e.ip.bb || null
+          zone: zoneFor(game, e), chase: !!e.ooz && CHASE_RES.includes(e.res),
+          spray: e.ip && e.ip.spray || null, bb: e.ip && e.ip.bb || null
         };
         pa.pitches.push(rec); S.allPitches.push(rec);
         switch (e.res) {
@@ -565,7 +578,7 @@
   function ordinal(n) { return ['th', 'st', 'nd', 'rd'][(n % 100 > 10 && n % 100 < 14) ? 0 : Math.min(n % 10, 4) % 4] || 'th'; }
 
   const api = {
-    PITCH_TYPES, RESULTS, STRIKE_RES, SWING_RES, CIRCLE_RES, HIT_CODES, SLOTS,
+    PITCH_TYPES, RESULTS, STRIKE_RES, SWING_RES, CIRCLE_RES, HIT_CODES, CHASE_RES, SLOTS,
     uid, other, newGame, player, pLabel, ordinal, handFor, inZone, defaultMoves, validateMoves, baseName,
     replay, pitchingStats, veloSummary, pitcherSidebar, ipStr, pct, zoneNumber, locWords,
     battingSide: bat, fieldingSide: fld

@@ -403,7 +403,7 @@
     // this at-bat so far
     h += '<div class="seq" style="margin-top:0">';
     if (S.cur && (S.cur.pitches.length || S.cur.autos.length || S.cur.events.length)) {
-      S.cur.pitches.forEach(p => { h += '<button class="chip ' + (p.strike ? 's' : '') + '" data-act="editPitch" data-ev="' + p.evIdx + '"><span class="n">' + p.b + '-' + p.s + '</span><span style="color:' + TCOL[p.type] + '">' + TN[p.type] + '</span> · ' + shortRes(p.res) + '</button>'; });
+      S.cur.pitches.forEach(p => { h += '<button class="chip ' + (p.strike ? 's' : '') + '" data-act="editPitch" data-ev="' + p.evIdx + '"><span class="n">' + p.b + '-' + p.s + '</span><span style="color:' + TCOL[p.type] + '">' + TN[p.type] + '</span> · ' + shortRes(p.res) + (p.chase ? ' · <b style="color:var(--red)">chase</b>' : '') + '</button>'; });
       S.cur.autos.forEach(a => { h += '<span class="chip">Auto ' + (a.res === 'B' ? 'ball' : 'strike') + '</span>'; });
       S.cur.events.forEach(ev => { h += '<span class="chip">' + esc(ev.desc) + '</span>'; });
       h += '<span class="chip" style="border-color:var(--ink)"><b>Count ' + S.balls + '-' + S.strikes + '</b></span>';
@@ -414,6 +414,7 @@
     h += '</div>';
     h += '<div class="types" id="types">' + [1, 2, 3, 4, 5, 0].map(t =>
       '<button class="tbtn ' + (P.type === t ? 'on' : '') + '" style="--c:' + TCOL[t] + '" data-act="ptype" data-v="' + t + '">' + (t ? t : '?') + '<small>' + (t === 5 ? esc(otLab) : t ? TN[t] : 'missed') + '</small></button>').join('') + '</div>';
+    h += '<button class="ooz ' + (P.ooz ? 'on' : '') + '" data-act="oozToggle">' + (P.ooz ? '✓ OUT OF ZONE — this swing is a chase' : 'Out of zone?  <small>tap before Swing &amp; miss / Foul / In play if he chased</small>') + '</button>';
     h += '<div class="results">' +
       '<button class="rbtn ball" data-act="res" data-v="B">Ball</button>' +
       '<button class="rbtn cs" data-act="res" data-v="CS">Called<small>strike</small></button>' +
@@ -503,7 +504,9 @@
     const P = App.pend;
     if (App.settings.requireType && P.type == null) { needType(); return; }
     if (res === 'IP') { openInPlay(); return; }
-    commit({ t: 'pitch', type: P.type || 0, velo: P.velo || null, loc: P.loc || null, res });
+    const ev = { t: 'pitch', type: P.type || 0, velo: P.velo || null, loc: P.loc || null, res };
+    if (P.ooz && E.CHASE_RES.includes(res)) ev.ooz = true;
+    commit(ev);
   }
 
   // ------------------------------------------------------------------ movers (runner destination picker)
@@ -614,7 +617,7 @@
           const data = { kind: M.kind, code: KIND_CODE[M.kind] || M.kind, cls: KIND_CLS[M.kind] || M.kind, notation: (M.nota || buildNotation(M.kind, M.f)).trim(), bb: M.bb, fielders: M.f, errors: M.errors, spray: M.spray, moves: M.moves };
           closeModal();
           if (edit) { ev.ip = data; afterChange(null, { quiet: true }); toast('Play updated'); }
-          else { const P = App.pend; commit({ t: 'pitch', type: P.type || 0, velo: P.velo || null, loc: P.loc || null, res: 'IP', ip: data }); }
+          else { const P = App.pend; const ev = { t: 'pitch', type: P.type || 0, velo: P.velo || null, loc: P.loc || null, res: 'IP', ip: data }; if (P.ooz) ev.ooz = true; commit(ev); }
         }
       },
       chg: { ipNota: el => { M.nota = el.value; M.notaEdited = true; const f = $('modalSheet').querySelector('.mfoot'); if (f) f.innerHTML = App.modal.foot(); } },
@@ -855,16 +858,18 @@
     if (!ev || !rec) return;
     const pa = S.paById[rec.paId] || S.cur;
     const endsPA = pa && pa.complete && pa.pitches[pa.pitches.length - 1].evIdx === evIdx;
-    const M = { type: ev.type || 0, velo: ev.velo || '', res: ev.res, loc: ev.loc ? Object.assign({}, ev.loc) : null, nota: ev.nota || '' };
+    const M = { type: ev.type || 0, velo: ev.velo || '', res: ev.res, loc: ev.loc ? Object.assign({}, ev.loc) : null, nota: ev.nota || '', ooz: !!ev.ooz };
     const strikeFam = ['CS', 'SW', 'FT', 'MB'];
+    const callMode = g.mode === 'call';
     openModal({
       title: 'Pitch ' + rec.n + ' to ' + pName(rec.side, rec.batter),
       body: () => {
         let h = '<div class="grp-lab">Pitch type</div>' + seg('epType', [1, 2, 3, 4, 5, 0].map(t => [t, t ? t + ' ' + TN[t] : '?']), M.type) +
-          '<div class="grp-lab">Velo</div><div class="row"><input class="txt" style="width:110px;font-size:22px" inputmode="numeric" value="' + esc(M.velo) + '" data-chg="epVelo"><span class="muted">leave blank if unknown</span></div>';
+          (callMode ? '' : '<div class="grp-lab">Velo</div><div class="row"><input class="txt" style="width:110px;font-size:22px" inputmode="numeric" value="' + esc(M.velo) + '" data-chg="epVelo"><span class="muted">leave blank if unknown</span></div>');
         if (strikeFam.includes(ev.res)) h += '<div class="grp-lab">Result</div>' + seg('epRes', strikeFam.map(r => [r, E.RESULTS[r]]), M.res);
         else h += '<div class="grp-lab">Result</div><div><b>' + E.RESULTS[ev.res] + '</b> <span class="muted">(to change a ball/strike/foul, Undo back to it, or use Fix)</span></div>';
-        h += '<div class="grp-lab">Location (tap to move)</div><div style="max-width:300px" id="epPadWrap">' + padSVG(rec.hand, [], M.loc, false) + '</div><button class="btn small" data-act="epClearLoc">No location</button>';
+        if (callMode) { if (E.CHASE_RES.includes(M.res)) h += '<div class="grp-lab">Out of zone (chase)?</div>' + seg('epOoz', [[1, 'Yes — chased'], [0, 'No']], M.ooz ? 1 : 0); }
+        else h += '<div class="grp-lab">Location (tap to move)</div><div style="max-width:300px" id="epPadWrap">' + padSVG(rec.hand, [], M.loc, false) + '</div><button class="btn small" data-act="epClearLoc">No location</button>';
         if (ev.res === 'IP') h += '<div class="grp-lab">Play</div><button class="btn" data-act="epPlay">Edit the play (' + esc(ev.ip ? ev.ip.notation : '') + ')</button>';
         else if (endsPA) h += '<div class="grp-lab">Scoring notation (optional override)</div><input class="txt" placeholder="' + esc(pa.result.notation) + '" value="' + esc(M.nota) + '" data-chg="epNota">';
         return h;
@@ -877,11 +882,13 @@
       acts: {
         epType: el => { M.type = +el.dataset.v; renderModal(); },
         epRes: el => { M.res = el.dataset.v; renderModal(); },
+        epOoz: el => { M.ooz = el.dataset.v === '1'; renderModal(); },
         epClearLoc: () => { M.loc = null; renderModal(); },
         epPlay: () => { closeModal(); openInPlay({ evIdx }); },
         epSave: () => {
           ev.type = M.type; ev.velo = M.velo ? +M.velo : null; ev.loc = M.loc;
           if (strikeFam.includes(ev.res) && strikeFam.includes(M.res)) ev.res = M.res;
+          if (callMode) { if (M.ooz && E.CHASE_RES.includes(ev.res)) ev.ooz = true; else delete ev.ooz; }
           if (endsPA && ev.res !== 'IP') { if (M.nota.trim()) ev.nota = M.nota.trim(); else delete ev.nota; }
           closeModal(); afterChange(null, { quiet: true }); toast('Pitch updated');
         }
@@ -898,7 +905,7 @@
       body: () => {
         let h = '<p><b>' + esc(paText(pa)) + '</b> · pitcher ' + esc(pName(pa.fside, pa.pitcher)) + ' · bats ' + pa.hand + '</p><div class="explist">';
         pa.pitches.forEach(p => {
-          h += '<button class="exp" data-act="editPitch" data-ev="' + p.evIdx + '" style="text-align:left"><b style="width:26px">' + p.n + '</b><span style="color:' + TCOL[p.type] + ';font-weight:800;width:40px">' + TN[p.type] + '</span><span style="width:40px">' + (p.velo || '—') + '</span><span class="grow">' + E.RESULTS[p.res] + (p.loc ? ' · ' + E.locWords(p.loc, p.hand) : ' · no location') + '</span><span class="muted">' + p.b + '-' + p.s + '</span></button>';
+          h += '<button class="exp" data-act="editPitch" data-ev="' + p.evIdx + '" style="text-align:left"><b style="width:26px">' + p.n + '</b><span style="color:' + TCOL[p.type] + ';font-weight:800;width:40px">' + TN[p.type] + '</span><span style="width:40px">' + (p.velo || '—') + '</span><span class="grow">' + E.RESULTS[p.res] + (p.chase ? ' · chase' : '') + (p.loc ? ' · ' + E.locWords(p.loc, p.hand) : (App.game.mode === 'call' ? '' : ' · no location')) + '</span><span class="muted">' + p.b + '-' + p.s + '</span></button>';
         });
         h += '</div>';
         if (pa.events.length) h += '<p class="muted">Runner events: ' + esc(pa.events.map(e => e.desc).join(', ')) + '</p>';
@@ -1020,7 +1027,7 @@
       tile('0-0 Strikes', pctS(T.fpStrike, T.fp), T.fpStrike + ' of ' + T.fp + ' first pitches', tg(st.tgtFps, T.fp ? 100 * T.fpStrike / T.fp : null, true)) +
       tile('Leadoff outs', T.lo ? T.loOut + '/' + T.lo : '—', pctS(T.loOut, T.lo) + ' of innings', tg(st.tgtLo, T.lo ? 100 * T.loOut / T.lo : null, true)) +
       tile('Spin it to win it', pctS(T.spin, T.pitches), 'CB/SL usage · ' + pctS(T.spinStrike, T.spin) + ' for strikes · ' + pctS(T.spinWhiff, T.spinSwing) + ' whiff') +
-      tile('Chase', pctS(T.oozSwing, T.ooz), T.oozSwing + ' swings on ' + T.ooz + ' located balls out of zone · ' + T.oozWhiff + ' chase whiffs', tg(st.tgtChase, T.ooz ? 100 * T.oozSwing / T.ooz : null, true)) +
+      tile('Chase', pctS(T.oozSwing, T.ooz), g.mode === 'call' ? T.oozSwing + ' chases · ' + T.oozWhiff + ' chase whiffs (chases ÷ chases + balls taken)' : T.oozSwing + ' swings on ' + T.ooz + ' located balls out of zone · ' + T.oozWhiff + ' chase whiffs', tg(st.tgtChase, T.ooz ? 100 * T.oozSwing / T.ooz : null, true)) +
       tile('Whiff', pctS(T.whiffs, T.swings), T.whiffs + ' misses on ' + T.swings + ' swings', tg(st.tgtWhiff, T.swings ? 100 * T.whiffs / T.swings : null, true)) +
       tile('Give no room', T.freeBases, 'free bases (std ' + st.fbStd + ') · BB ' + T.bb + ' HBP ' + T.hbp + ' WP ' + T.wp + ' PB ' + T.pb + ' SB ' + T.sb + ' BK ' + T.bk, tg(st.fbStd, T.freeBases, false)) +
       tile('Strikes', pctS(T.strikes, T.pitches), T.pitches + ' pitches · ' + T.k + ' K · ' + T.h + ' H') + '</div>';
@@ -1193,6 +1200,7 @@
     editPitch: el => openEditPitch(+el.dataset.ev),
     fillBatter: el => openFill(el.dataset.side, +el.dataset.slot),
     scoutAll: el => { App.scoutAll = el.dataset.v === '1'; render(); },
+    oozToggle: () => { App.pend.ooz = !App.pend.ooz; render(); },
     setMode: el => { App.setup.mode = el.dataset.v; render(); },
     ourRuns: el => { App.ourRuns = Math.max(0, (App.ourRuns || 0) + +el.dataset.d); render(); },
     theirHalf: () => {

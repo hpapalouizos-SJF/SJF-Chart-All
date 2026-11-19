@@ -38,7 +38,7 @@
       'lineup_slot', 'batter_num', 'batter_name', 'batter_hand', 'pitcher_num', 'pitcher_name', 'pitcher_throws',
       'row_type', 'pitch_of_pa', 'pitcher_pitch_count', 'balls_before', 'strikes_before', 'outs_before',
       'runner_1b', 'runner_2b', 'runner_3b', 'pitch_type_code', 'pitch_type', 'velo', 'loc_x', 'loc_y', 'in_zone', 'zone_1_14',
-      'location', 'pitch_result', 'swing', 'whiff', 'pa_result', 'notation', 'batted_ball', 'spray_x_ft', 'spray_y_ft', 'runs_on_play',
+      'location', 'pitch_result', 'swing', 'whiff', 'chase', 'pa_result', 'notation', 'batted_ball', 'spray_x_ft', 'spray_y_ft', 'runs_on_play',
       'runner_event', 'pa_note'];
     const rows = [cols.join(',')];
     const pas = S.pas.slice(); if (S.cur) pas.push(S.cur);
@@ -62,21 +62,21 @@
           r = common(p.pitcher).concat(['pitch', p.n, p.pc, p.b, p.s, p.outs, p.bases[0] ? 1 : 0, p.bases[1] ? 1 : 0, p.bases[2] ? 1 : 0,
             p.type, TN[p.type], p.velo || '', p.loc ? p.loc.x.toFixed(3) : '', p.loc ? p.loc.y.toFixed(3) : '',
             p.zone === null ? '' : p.zone ? 1 : 0, E.zoneNumber(p.loc), E.locWords(p.loc, p.hand), E.RESULTS[p.res],
-            p.swing ? 1 : 0, p.whiff ? 1 : 0,
+            p.swing ? 1 : 0, p.whiff ? 1 : 0, p.chase ? 1 : '',
             isLast ? pa.result.code + (pa.result.looking ? ' (looking)' : '') : '', isLast ? pa.result.notation : '',
             isLast ? (pa.result.bb || '') : '', isLast && pa.result.spray && pa.result.spray.xft != null ? pa.result.spray.xft : '', isLast && pa.result.spray && pa.result.spray.yft != null ? pa.result.spray.yft : '',
             isLast ? pa.runsOnPlay : '', '', isLast ? pa.notes.join(' | ') : '']);
         } else if (it.a) {
-          r = common(pa.pitcher).concat(['automatic', '', '', it.a.b, it.a.s, '', '', '', '', '', '', '', '', '', '', '', '', it.a.res === 'B' ? 'Automatic ball' : 'Automatic strike', '', '', '', '', '', '', '', '', '', '']);
+          r = common(pa.pitcher).concat(['automatic', '', '', it.a.b, it.a.s, '', '', '', '', '', '', '', '', '', '', '', '', it.a.res === 'B' ? 'Automatic ball' : 'Automatic strike', '', '', '', '', '', '', '', '', '', '', '']);
         } else if (it.ev) {
-          r = common(pa.pitcher).concat(['runner_event', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', it.ev.desc, '']);
+          r = common(pa.pitcher).concat(['runner_event', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', it.ev.desc, '']);
         } else {
-          r = common(pa.pitcher).concat(['no_pitch_pa', '', '', '', '', pa.startOuts, '', '', '', '', '', '', '', '', '', '', '', '', '', '', pa.result.code, pa.result.notation, '', '', '', pa.runsOnPlay, '', pa.notes.join(' | ')]);
+          r = common(pa.pitcher).concat(['no_pitch_pa', '', '', '', '', pa.startOuts, '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', pa.result.code, pa.result.notation, '', '', '', pa.runsOnPlay, '', pa.notes.join(' | ')]);
         }
         rows.push(r.map(csvCell).join(','));
       });
       if (!pa.complete && pa.endedInning) {
-        const r = common(pa.pitcher).concat(['pa_incomplete', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', 'inning ended during PA', '', '', '', '', '', '']);
+        const r = common(pa.pitcher).concat(['pa_incomplete', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', 'inning ended during PA', '', '', '', '', '', '']);
         rows.push(r.map(csvCell).join(','));
       }
     });

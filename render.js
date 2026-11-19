@@ -148,7 +148,7 @@
     const lgY = L.top - 8;
     P.text('Pitch # (1-5) in B or S row · circled = swing/bunt · filled = swing & miss · A = automatic ball/strike · V row = velo · dots = location (catcher view, # = pitch of AB, filled = strike) · bottom-right = pitcher pitch count',
       L.x0, lgY - 7, { size: 4.9, color: '#333' });
-    P.text('Heavy line under a box = end of inning · batted ball: curved = fly/pop, straight = line drive, dotted = grounder/bunt · heavy base path = bases reached, shaded diamond = scored, x = out on the bases',
+    P.text((game.mode === 'call' ? 'ch in V row = chased a pitch out of the zone · ' : '') + 'Heavy line under a box = end of inning · batted ball: curved = fly/pop, straight = line drive, dotted = grounder/bunt · heavy base path = bases reached, shaded diamond = scored, x = out on the bases',
       L.x0, lgY, { size: 4.9, color: '#333' });
 
     // ---------- grid frame
@@ -258,6 +258,7 @@
         else { P.circle(cx, cy, rr, { lw: 0.6 }); P.text(ty, cx, cy + 0.3, { size: fsz, align: 'center', base: 'middle' }); }
       } else P.text(ty, cx, cy + 0.3, { size: fsz, align: 'center', base: 'middle' });
       if (p.velo) P.text(p.velo, cx, gy + 2 * gh + gh / 2 + 0.3, { size: Math.min(5.6, cw * 0.62), align: 'center', base: 'middle' });
+      else if (p.chase) P.text('ch', cx, gy + 2 * gh + gh / 2 + 0.3, { size: Math.min(5.2, cw * 0.55), bold: true, align: 'center', base: 'middle', color: '#9D2235' });
     });
 
     // location dots
